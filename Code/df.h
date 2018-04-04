@@ -1,2 +1,0 @@
-#define YYLTYPE
-#define YYLTYPE_IS_DECLARED

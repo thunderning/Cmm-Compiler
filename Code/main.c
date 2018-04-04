@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include "myTree.h"
 extern FILE* yyin;
+extern Node* startNode;
+
 int main(int argc, char** argv){
   if (argc <= 1 ) return 1;
   FILE* f = fopen(argv[1], "r");
@@ -11,5 +14,6 @@ int main(int argc, char** argv){
   }
   yyrestart(f);
   yyparse();
+  //if(startNode != NULL) printTree(startNode);
   return 0;
 }
