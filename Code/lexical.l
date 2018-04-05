@@ -8,6 +8,7 @@
     yylval = malloc(sizeof(Node)); \
     yylval->linenum = yylineno; \
     yylval->length = 0;
+  extern int iserror;
 %}
 
 ws [ \t\r\n]+
@@ -53,5 +54,5 @@ while {yylval->type = TR_WHILE;return WHILE;}
 {digit}+"."{digit}+ {yylval->valFloat = strtof(yytext,NULL); yylval->type = TR_FLOAT;return FLOAT;}
 {letter}+[_a-zA-Z0-9]* { strcpy(yylval->valString,yytext); yylval->type = TR_ID;return ID;}
 {ws} {  }
-. {printf("Error type A at Line %d: Mysterious characters %d\n", yylineno, yytext[0]);}
+. {printf("Error type A at Line %d: Mysterious characters \"%c\"\n", yylineno, yytext[0]);iserror = 1;}
 %%

@@ -4,6 +4,12 @@
   #include "lex.yy.c"
   #define YYSTYPE Node*
   Node* startNode;
+  int iserror = 0;
+  int yyerror(char *s) {}
+  void printfError(char c,int line){
+    printf("Error type B at Line %d: Missing \"%c\"\n",line,c);
+    iserror = 1;
+  }
 %}
 
 %token SEMI COMMA
@@ -25,7 +31,7 @@
 
 
 %%
-Program : ExtDefList {startNode = $$;$$ = malloc(sizeof(Node));insertNode(1,$$,TR_Program,$1); printTree($$,0);}
+Program : ExtDefList {startNode = $$;$$ = malloc(sizeof(Node));insertNode(1,$$,TR_Program,$1);}
   ;
 ExtDefList : ExtDef ExtDefList {$$ = malloc(sizeof(Node));insertNode(2,$$,TR_ExtDefList,$1,$2);}
   | {$$ = malloc(sizeof(Node));insertNode(0,$$,TR_ExtDefList);}
@@ -52,9 +58,11 @@ Tag : ID {$$ = malloc(sizeof(Node));insertNode(1,$$,TR_Tag,$1);}
 
 VarDec : ID {$$ = malloc(sizeof(Node));insertNode(1,$$,TR_VarDec,$1);}
   | VarDec LB INT RB {$$ = malloc(sizeof(Node));insertNode(4,$$,TR_VarDec,$1,$2,$3,$4);}
+  | VarDec LB error RB {printfError(']',yylineno);}
   ;
 FunDec : ID LP VarList RP {$$ = malloc(sizeof(Node));insertNode(4,$$,TR_FunDec,$1,$2,$3,$4);}
   | ID LP RP {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_FunDec,$1,$2,$3);}
+  | ID LP error RP {printfError(')',yylineno);}
   ;
 VarList : ParamDec COMMA VarList {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_VarList,$1,$2,$3);}
   | ParamDec {$$ = malloc(sizeof(Node));insertNode(1,$$,TR_VarList,$1);}
@@ -68,8 +76,10 @@ StmtList : Stmt StmtList {$$ = malloc(sizeof(Node));insertNode(2,$$,TR_StmtList,
   | {$$ = malloc(sizeof(Node));insertNode(0,$$,TR_StmtList);}
   ;
 Stmt : Exp SEMI {$$ = malloc(sizeof(Node));insertNode(2,$$,TR_Stmt,$1,$2);}
+  | error SEMI {printfError(';',yylineno);}
   | CompSt {$$ = malloc(sizeof(Node));insertNode(1,$$,TR_Stmt,$1);}
   | RETURN Exp SEMI {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Stmt,$1,$2,$3);}
+  | RETURN error SEMI {printfError(';',yylineno);}
   | IF LP Exp RP Stmt %prec LOWER_THAN_ELSE {$$ = malloc(sizeof(Node));insertNode(5,$$,TR_Stmt,$1,$2,$3,$4,$5);}
   | IF LP Exp RP Stmt ELSE Stmt {$$ = malloc(sizeof(Node));insertNode(7,$$,TR_Stmt,$1,$2,$3,$4,$5,$6,$7);}
   | WHILE LP Exp RP Stmt {$$ = malloc(sizeof(Node));insertNode(5,$$,TR_Stmt,$1,$2,$3,$4,$5);}
@@ -79,6 +89,7 @@ DefList : Def DefList {$$ = malloc(sizeof(Node));insertNode(2,$$,TR_DefList,$1,$
   | {$$ = malloc(sizeof(Node));insertNode(0,$$,TR_DefList);}
   ;
 Def : Specifier DecList SEMI {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Def,$1,$2,$3);}
+  | Specifier error SEMI {printfError(';',yylineno);}
   ;
 DecList : Dec {$$ = malloc(sizeof(Node));insertNode(1,$$,TR_DecList,$1);}
   | Dec COMMA DecList {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_DecList,$1,$2,$3);}
@@ -90,8 +101,10 @@ Dec : VarDec {$$ = malloc(sizeof(Node));insertNode(1,$$,TR_Dec,$1);}
 Exp : Exp DOT ID {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
   | LP Exp RP {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
   | ID LP Args RP {$$ = malloc(sizeof(Node));insertNode(4,$$,TR_Exp,$1,$2,$3,$4);}
+  | ID LP error RP {printfError(')',yylineno);}
   | ID LP RP {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
   | Exp LB Exp RB {$$ = malloc(sizeof(Node));insertNode(4,$$,TR_Exp,$1,$2,$3,$4);}
+  | Exp LB error RB {printfError(']',yylineno);}
   | NOT Exp {$$ = malloc(sizeof(Node));insertNode(2,$$,TR_Exp,$1,$2);}
   | MINUS Exp {$$ = malloc(sizeof(Node));insertNode(2,$$,TR_Exp,$1,$2);}
   | Exp STAR Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}

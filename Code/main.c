@@ -3,6 +3,7 @@
 #include "myTree.h"
 extern FILE* yyin;
 extern Node* startNode;
+extern int iserror;
 
 int main(int argc, char** argv){
   if (argc <= 1 ) return 1;
@@ -14,6 +15,6 @@ int main(int argc, char** argv){
   }
   yyrestart(f);
   yyparse();
-  //if(startNode != NULL) printTree(startNode);
+  if(iserror == 0) printTree(startNode,0);
   return 0;
 }
