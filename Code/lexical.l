@@ -21,12 +21,12 @@ hex [a-fA-F0-9]
 ";" {yylval->type = TR_SEMI;return SEMI;}
 "," {yylval->type = TR_COMMA;return COMMA;}
 "=" {yylval->type = TR_ASSIGNOP;return ASSIGNOP;}
-">" {yylval->type = TR_RELOP;return RELOP;}
-"<" {yylval->type = TR_RELOP;return RELOP;}
-">=" {yylval->type = TR_RELOP;return RELOP;}
-"<=" {yylval->type = TR_RELOP;return RELOP;}
-"==" {yylval->type = TR_RELOP;return RELOP;}
-"!=" {yylval->type = TR_RELOP;return RELOP;}
+">" {yylval->type = TR_RELOP;yylval->valInt = 1;return RELOP;}
+"<" {yylval->type = TR_RELOP;yylval->valInt = 2;return RELOP;}
+">=" {yylval->type = TR_RELOP;yylval->valInt = 3;return RELOP;}
+"<=" {yylval->type = TR_RELOP;yylval->valInt = 4;return RELOP;}
+"==" {yylval->type = TR_RELOP;yylval->valInt = 5;return RELOP;}
+"!=" {yylval->type = TR_RELOP;yylval->valInt = 6;return RELOP;}
 "+" {yylval->type = TR_PLUS;return PLUS;}
 "-" {yylval->type = TR_MINUS;return MINUS;}
 "*" {yylval->type = TR_STAR;return STAR;}

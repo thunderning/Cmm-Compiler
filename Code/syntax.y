@@ -3,8 +3,8 @@
   #include "myTree.h"
   #include "lex.yy.c"
   #define YYSTYPE Node*
-  Node* startNode;
-  int iserror = 0;
+  Node* startNode; //语法树根节点
+  int iserror = 0; //判断是否有错误，来确定是否输出语法树
   int yyerror(char *s) {}
   void printfError(char c,int line){
     printf("Error type B at Line %d: Missing \"%c\"\n",line,c);
