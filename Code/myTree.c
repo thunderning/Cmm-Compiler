@@ -41,7 +41,12 @@ void printTree(Node* start,int depth){
     case TR_TYPE:
       printf(" : %s", start->valInt == 1? "int" : "float");break;
   }
-  printf(" (%d)\n",start->linenum );
+  if (start->type == TR_Program||start->type == TR_ExtDefList||start->type == TR_ExtDef||start->type == TR_ExtDecList||start->type == TR_Specifier||start->type == TR_StructSpecifier||
+  start->type ==TR_OptTag||start->type == TR_Tag||start->type == TR_VarDec||start->type == TR_FunDec||start->type == TR_VarList||start->type == TR_ParamDec||start->type == TR_CompSt||
+  start->type ==TR_StmtList||start->type == TR_Stmt||start->type == TR_DefList||start->type == TR_Def||start->type == TR_DecList||start->type == TR_Dec||start->type == TR_Exp||start->type == TR_Args) {
+    printf(" (%d)",start->linenum );
+  }
+  printf("\n");
   if (start->length == 0) return;
   for (int i = 0; i < start->length; i++) {
     printTree(start->childNodes[i],depth+1);
