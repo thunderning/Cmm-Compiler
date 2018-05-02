@@ -31,7 +31,7 @@
 
 
 %%
-Program : ExtDefList {startNode = $$;$$ = malloc(sizeof(Node));insertNode(1,$$,TR_Program,$1);}
+Program : ExtDefList {startNode = malloc(sizeof(Node));insertNode(1,startNode,TR_Program,$1);}
   ;
 ExtDefList : ExtDef ExtDefList {$$ = malloc(sizeof(Node));insertNode(2,$$,TR_ExtDefList,$1,$2);}
   | {$$ = malloc(sizeof(Node));insertNode(0,$$,TR_ExtDefList);}
