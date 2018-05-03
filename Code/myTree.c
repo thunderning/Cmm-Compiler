@@ -6,7 +6,7 @@ void insertNode(int num,...){
   Node* cNode = NULL;
   enum NodeType nt;
   pNode = va_arg(parg,Node*);
-  nt = va_arg(parg,enum NodeType);    //前两个参数为根节点
+  nt = va_arg(parg,enum NodeType);   //前两个参数为根节点
   pNode->length = 0;
   pNode->type = nt;
   for(int i = 0;i < num;i++){

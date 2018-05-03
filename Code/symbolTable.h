@@ -5,14 +5,12 @@
 typedef struct symbol_ Symbol;
 typedef struct FuncMessage_ FuncMessage;
 typedef struct stacklist StackList;
-#define ST_MAX 256
 
 /* 定义一个表示链表的结构体指针 */
 struct symbol_ {
     int depth;
-    char* name;
+    char name[32];
     enum{Func,Variable,Struct} kind;
-    int defTag;//用于判断函数是否被定义
     int lineNum;
     FuncMessage* funcMessage;
     Type* variableMessage;

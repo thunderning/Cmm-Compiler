@@ -1,3 +1,7 @@
+#ifndef MYTREE_H
+#define MYTREE_H
+
+
 #include "stdarg.h"
 #include "stdio.h"
 enum NodeType{
@@ -33,3 +37,6 @@ typedef struct node{
 
 void insertNode(int num,...);
 void printTree(Node* start,int depth);
+
+
+#endif // MYTREE_H

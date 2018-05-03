@@ -25,10 +25,14 @@
 
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE
-
-%left LP RP LB RB DOT PLUS MINUS STAR DIV RELOP AND OR
-%right NOT ASSIGNOP
-
+%right ASSIGNOP
+%left OR
+%left AND
+%left RELOP
+%left PLUS MINUS
+%left STAR DIV
+%right NOT
+%left LP RP LB RB DOT
 
 %%
 Program : ExtDefList {startNode = malloc(sizeof(Node));insertNode(1,startNode,TR_Program,$1);}
@@ -98,23 +102,23 @@ Dec : VarDec {$$ = malloc(sizeof(Node));insertNode(1,$$,TR_Dec,$1);}
   | VarDec ASSIGNOP Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Dec,$1,$2,$3);}
   ;
 
-Exp : Exp DOT ID {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
-  | LP Exp RP {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
-  | ID LP Args RP {$$ = malloc(sizeof(Node));insertNode(4,$$,TR_Exp,$1,$2,$3,$4);}
-  | ID LP error RP {printfError(')',yylineno);}
-  | ID LP RP {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
-  | Exp LB Exp RB {$$ = malloc(sizeof(Node));insertNode(4,$$,TR_Exp,$1,$2,$3,$4);}
-  | Exp LB error RB {printfError(']',yylineno);}
-  | NOT Exp {$$ = malloc(sizeof(Node));insertNode(2,$$,TR_Exp,$1,$2);}
-  | MINUS Exp {$$ = malloc(sizeof(Node));insertNode(2,$$,TR_Exp,$1,$2);}
-  | Exp STAR Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
-  | Exp DIV Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
-  | Exp PLUS Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
-  | Exp MINUS Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
-  | Exp RELOP Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
-  | Exp AND Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
+Exp : Exp ASSIGNOP Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
   | Exp OR Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
-  | Exp ASSIGNOP Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
+  | Exp AND Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
+  | Exp RELOP Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
+  | Exp MINUS Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
+  | Exp PLUS Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
+  | Exp DIV Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
+  | Exp STAR Exp {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
+  | MINUS Exp {$$ = malloc(sizeof(Node));insertNode(2,$$,TR_Exp,$1,$2);}
+  | NOT Exp {$$ = malloc(sizeof(Node));insertNode(2,$$,TR_Exp,$1,$2);}
+  | Exp LB error RB {printfError(']',yylineno);}
+  | Exp LB Exp RB {$$ = malloc(sizeof(Node));insertNode(4,$$,TR_Exp,$1,$2,$3,$4);}
+  | ID LP RP {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
+  | ID LP error RP {printfError(')',yylineno);}
+  | ID LP Args RP {$$ = malloc(sizeof(Node));insertNode(4,$$,TR_Exp,$1,$2,$3,$4);}
+  | LP Exp RP {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
+  | Exp DOT ID {$$ = malloc(sizeof(Node));insertNode(3,$$,TR_Exp,$1,$2,$3);}
   | ID {$$ = malloc(sizeof(Node));insertNode(1,$$,TR_Exp,$1);}
   | INT {$$ = malloc(sizeof(Node));insertNode(1,$$,TR_Exp,$1);}
   | FLOAT {$$ = malloc(sizeof(Node));insertNode(1,$$,TR_Exp,$1);}
