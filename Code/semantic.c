@@ -19,6 +19,7 @@ void ExtDefList(Node* node){
     ExtDef(node->childNodes[0]);
     ExtDefList(node->childNodes[1]);
 }
+
 void ExtDef(Node *node)
 {
     if(NULL == node)
@@ -48,7 +49,6 @@ void ExtDef(Node *node)
     }
     return;
 }
-
 
 void ExtDecList(Node *node, Type *type)
 {
