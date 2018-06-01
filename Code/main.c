@@ -19,5 +19,9 @@ int main(int argc, char** argv){
   //if(iserror == 0) printTree(startNode,0);
   //printf("----------------------------------------------------\n");
   Program(startNode);
+  printf("Finish translate\n");
+  optimizeCode();
+  printCodes(argv[2]);
+
   return 0;
 }

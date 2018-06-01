@@ -16,13 +16,15 @@ InterCode* headCode;
 InterCode* tailCode;
 
 typedef struct Operand_{
-    enum{O_TEMPVAR,O_VARIABLE,O_CONSTANT,O_LABEL,O_FUNCTION } kind;
+    enum{O_TEMPVAR,O_VARIABLE,O_CONSTANT,O_LABEL,O_FUNCTION,O_ADDRESS,O_NULL } kind;
 
     union{
         int var_no;
         int value;
-        char *name;
+        char name[32];
     }u;
+
+    Operand *next;
 } Operand_;
 
 typedef struct InterCode_{
@@ -50,6 +52,8 @@ void deleteCode(InterCode* ic);
 void printCodes(char* filename);
 void printOp(FILE* fout,Operand* op);
 void printCode(FILE* fout,InterCode* ic);
-
-
+void optimizeCode();
+Operand* newTemp();
+Operand* newLabel();
+Operand* newAddr();
 #endif // INTERCODE_H

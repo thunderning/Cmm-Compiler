@@ -46,6 +46,7 @@ void hashLink(Symbol **head, Symbol *node)
 
 void stackAdd()
 {
+  //printf("add!\n");
   if (NULL == stackHead) {
     stackHead = malloc(sizeof(StackList));
     stackHead->firstSymbol = NULL;
@@ -85,12 +86,14 @@ void stackDelete()
   }
   else{
     StackList *q;
-    for(q = stackHead; q->next != stackTail; q = q -> next)
+    for(q = stackHead; q->next != stackTail; q = q -> next);
     free(stackTail);
     stackTail = q;
     q->next = NULL;
   }
   currentDepth--;
+  //printf("delete!\n");
+
 }
 //计算hash值
 int countHash(char *name)

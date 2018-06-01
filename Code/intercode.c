@@ -51,6 +51,7 @@ void printOp(FILE *fout, Operand *op)
 {
     switch (op->kind) {
     case O_TEMPVAR:
+    case O_ADDRESS:
         fprintf(fout,"%c%d",OutTempVar,op->u.var_no);
         break;
     case O_VARIABLE:
@@ -66,6 +67,7 @@ void printOp(FILE *fout, Operand *op)
         fprintf(fout,"%s",op->u.name);
         break;
     default:
+        fprintf(fout,"NULL");
         break;
     }
 }
@@ -216,4 +218,47 @@ void printCode(FILE* fout,InterCode* ic){
     default:
         break;
     }
+}
+
+void optimizeCode(){
+    
+    for(InterCode* i = headCode; i != NULL;)
+    {
+        if(i->u.sinop.x.kind == O_NULL ||
+        i->u.binop.x.kind == O_NULL ||
+        i->u.triop.x.kind == O_NULL ||
+        i->u.forop.x.kind == O_NULL ||
+        i->u.dec.op.kind == O_NULL){
+            InterCode* p = i;
+            i = i->next;
+            deleteCode(p);
+        }
+        else{
+            i = i->next;
+        }
+
+    }
+    
+}
+
+Operand* newTemp(){
+    Operand *ret = malloc(sizeof(Operand));
+    ret->kind = O_TEMPVAR;
+    ret->u.var_no = tCount;
+    tCount++;
+    return ret;
+}
+Operand* newLabel(){
+    Operand *ret = malloc(sizeof(Operand));
+    ret->kind = O_LABEL;
+    ret->u.var_no = lCount;
+    lCount++;
+    return ret;
+}
+Operand* newAddr(){
+    Operand *ret = malloc(sizeof(Operand));
+    ret->kind = O_ADDRESS;
+    ret->u.var_no = tCount;
+    tCount++;
+    return ret;
 }

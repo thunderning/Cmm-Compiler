@@ -1,13 +1,15 @@
 #include "semantic.h"
 #include "symboltable.h"
 
-void Program(Node* start){
+void Program(Node* start)
+{
     stackAdd();
     ExtDefList(start->childNodes[0]);
     stackDelete();
 }
 
-void ExtDefList(Node* node){
+void ExtDefList(Node* node)
+{
     if(NULL == node)
         return;
 
@@ -68,6 +70,18 @@ void ExtDecList(Node *node, Type *type)
         newSb->lineNum = node->linenum;
         newSb->variableMessage = fl->type;
         strcpy(newSb->name,fl->name);
+        //intercode generate
+        if(fl->type->kind == ARRAY){
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_DEC;
+            ic->u.dec.op.kind = O_VARIABLE;
+            strcpy(ic->u.dec.op.u.name,newSb->name);
+            ic->u.dec.size = 4;
+            for(Type *t = newSb->variableMessage;t->kind == ARRAY;t = t->u.array.elem)
+                ic->u.dec.size = ic->u.dec.size * t->u.array.size;
+            addCode(ic);
+        }
+
         stAdd(newSb);
     }
     switch (node->length) {
@@ -223,17 +237,14 @@ FieldList* VarDec(Node *node, Type* type)
         break;
     case 4:{
         //VarDec -> VarDec LB INT RB
-        FieldList *fltemp = VarDec(node->childNodes[0],type);
-        if(fltemp != NULL){
-            fl->name = fltemp->name;
-            fl->tail = NULL;
-            Type *t = malloc(sizeof(Type));
-            t->kind = ARRAY;
-            t->u.array.elem = fltemp->type;
-            t->u.array.size = node->childNodes[2]->valInt;
-            fl->type = t;
-            return fl;
-        }
+        // fl->name = fltemp->name;
+        // fl->tail = NULL;
+        Type *t = malloc(sizeof(Type));
+        t->kind = ARRAY;
+        t->u.array.elem = type;
+        t->u.array.size = node->childNodes[2]->valInt;
+        fl = VarDec(node->childNodes[0],t);
+        return fl;
         break;
     }
     default:
@@ -273,6 +284,13 @@ void FunDec(Node *node, Type* type)
     stAdd(newSb);
     //在新的深度记录参数，在大括号结束时退栈
     stackAdd();
+    //intercode generate
+    InterCode *ic = malloc(sizeof(InterCode));
+    ic->kind = I_FUNCTION;
+    ic->u.sinop.x.kind = O_FUNCTION;
+    strcpy(ic->u.sinop.x.u.name,newSb->name);
+    addCode(ic);
+
     switch (node->length) {
     case 3:
         fm->input = NULL;
@@ -326,9 +344,24 @@ FieldList* ParamDec(Node *node)
         newSb->depth = currentDepth;
         newSb->kind = Variable;
         newSb->lineNum = node->linenum;
-        newSb->variableMessage = fl->type;
+        if(fl->type->kind == ARRAY)
+        { 
+            newSb->variableMessage = malloc(sizeof(Type));
+            newSb->variableMessage->kind = ADDRESS;
+            newSb->variableMessage->u = fl->type->u;
+        }
+        else{
+            newSb->variableMessage = fl->type;
+        }
         strcpy(newSb->name,fl->name);
         stAdd(newSb);
+
+        //intercode generate
+        InterCode *ic = malloc(sizeof(InterCode));
+        ic->kind = I_PARAM;
+        ic->u.sinop.x.kind = O_VARIABLE;
+        strcpy(ic->u.sinop.x.u.name,newSb->name);
+        addCode(ic);
     }
     return fl;
 }
@@ -368,42 +401,110 @@ void Stmt(Node *node, Type* retype)
     if(NULL == node)
         return;
     switch (node->length) {
-    case 1:
+    case 1:{
         //Stmt -> CompSt
         stackAdd();
         CompSt(node->childNodes[0],retype);
         break;
-    case 2:
+    }
+    case 2:{
         //Stmt -> Exp SEMI
-        Exp(node->childNodes[0],0,NULL);
+        Operand *op = malloc(sizeof(Operand));
+        op->kind = O_NULL;
+        Exp(node->childNodes[0],0,NULL,op);
         break;
+    }
     case 3:{
         //Stmt -> RETURN Exp SEMI
-        Type *t = Exp(node->childNodes[1],0,NULL);
+        Operand *t1 = newTemp();
+        Type *t = Exp(node->childNodes[1],0,NULL,t1);
         if(!TypeEqual(t,retype))
             ErrorHandle(8,node->linenum,"");
+        InterCode *ic = malloc(sizeof(InterCode));
+        ic->kind = I_RETURN;
+        ic->u.sinop.x = *t1;
+        addCode(ic);
         break;
     }
     case 5:{
         //Stmt -> IF LP Exp RP Stmt
         //Stmt -> WHILE LP Exp RP Stmt
-        Type *t = Exp(node->childNodes[2],0,NULL);
+        Operand *l0;
+
+
+        if (node->childNodes[0]->type == TR_WHILE) {
+            l0 = newLabel();
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_LABEL;
+            ic->u.sinop.x = *l0;
+            addCode(ic);
+        }
+        
+
+        Operand *l1 = newLabel();
+        Operand *l2 = newLabel();
+        
+        Type *t = Cond(node->childNodes[2],l1,l2);
         if(t == NULL)
             return;
         if(t->kind != BASIC || t->u.basic == 0)
             ErrorHandle(7,node->linenum,"");
+
+        InterCode *ic = malloc(sizeof(InterCode));
+        ic->kind = I_LABEL;
+        ic->u.sinop.x = *l1;
+        addCode(ic);
+
         Stmt(node->childNodes[4],retype);
+
+        if (node->childNodes[0]->type == TR_WHILE) {
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_GOTO;
+            ic->u.sinop.x = *l0;
+            addCode(ic);
+        }
+
+        InterCode *ic0 = malloc(sizeof(InterCode));
+        ic0->kind = I_LABEL;
+        ic0->u.sinop.x = *l2;
+        addCode(ic0);
         break;
     }
     case 7:{
         //Stmt -> IF LP Exp RP Stmt ELSE Stmt
-        Type *t = Exp(node->childNodes[2],0,NULL);
+        Operand *l1 = newLabel();
+        Operand *l2 = newLabel();
+        Operand *l3 = newLabel();
+
+        Type *t = Cond(node->childNodes[2],l1,l2);
         if(t == NULL)
             return;
         if(t->kind != BASIC || t->u.basic == 0)
             ErrorHandle(7,node->linenum,"");
+        
+        InterCode *ic = malloc(sizeof(InterCode));
+        ic->kind = I_LABEL;
+        ic->u.sinop.x = *l1;
+        addCode(ic);
+
         Stmt(node->childNodes[4],retype);
+
+        InterCode *ic0 = malloc(sizeof(InterCode));
+        ic0->kind = I_GOTO;
+        ic0->u.sinop.x = *l3;
+        addCode(ic0);
+
+        InterCode *ic1 = malloc(sizeof(InterCode));
+        ic1->kind = I_LABEL;
+        ic1->u.sinop.x = *l2;
+        addCode(ic1);
+
         Stmt(node->childNodes[6],retype);
+
+        InterCode *ic2 = malloc(sizeof(InterCode));
+        ic2->kind = I_LABEL;
+        ic2->u.sinop.x = *l3;
+        addCode(ic2);
         break;
     }
     default:
@@ -492,6 +593,19 @@ FieldList *Dec(Node *node, Type* type, int root)
     newSb->lineNum = node->linenum;
     newSb->variableMessage = fl->type;
     strcpy(newSb->name,fl->name);
+
+    //intercode generate
+    if(fl->type->kind == ARRAY){
+        InterCode *ic = malloc(sizeof(InterCode));
+        ic->kind = I_DEC;
+        ic->u.dec.op.kind = O_VARIABLE;
+        strcpy(ic->u.dec.op.u.name,newSb->name);
+        ic->u.dec.size = 4;
+        for(Type *t = newSb->variableMessage;t->kind == ARRAY;t = t->u.array.elem)
+            ic->u.dec.size = ic->u.dec.size * t->u.array.size;
+        addCode(ic);
+    }
+
     stAdd(newSb);
     switch (node->length) {
     case 1:
@@ -500,7 +614,10 @@ FieldList *Dec(Node *node, Type* type, int root)
         break;
     case 3:{
         //Dec -> VarDec ASSIGNOP Exp
-        Type *t = Exp(node->childNodes[2],0,NULL);
+        Operand *op = malloc(sizeof(Operand));
+        op->kind = O_VARIABLE;
+        strcpy(op->u.name,newSb->name);
+        Type *t = Exp(node->childNodes[2],0,NULL,op);
         if(!TypeEqual(fl->type,t))
             ErrorHandle(5,node->linenum,"");
         if(ROOT_STRUCT == root)
@@ -513,7 +630,7 @@ FieldList *Dec(Node *node, Type* type, int root)
     }
 }
 
-Type* Exp(Node *node, int ifLeft, int *retLeft)
+Type* Exp(Node *node, int ifLeft, int *retLeft,Operand *place)
 {
     if(NULL == node)
         return NULL;
@@ -526,41 +643,103 @@ Type* Exp(Node *node, int ifLeft, int *retLeft)
             Symbol *sb = stSearch(node->childNodes[0]->valString);
             if(sb == NULL)
                 ErrorHandle(1,node->linenum,node->childNodes[0]->valString);
-            else
+            else{
                 ret = sb->variableMessage;
+                //intercode generate
+                InterCode *ic = malloc(sizeof(InterCode));
+                if(place->kind == O_ADDRESS && sb->variableMessage->kind == ARRAY)
+                    ic->kind = I_GETADDR;
+                else
+                    ic->kind = I_ASSIGN;
+                ic->u.binop.x = *place;
+                ic->u.binop.y.kind = O_VARIABLE;
+                strcpy(ic->u.binop.y.u.name,sb->name);
+                addCode(ic);
+            }
             if(1 == ifLeft)
                 *retLeft = 1;
             break;
         }
-        case TR_INT:
+        case TR_INT:{
             //Exp -> INT
             ret = malloc(sizeof(Type));
             ret->kind = BASIC;
             ret->u.basic = 1;
+            //intercode generate
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_ASSIGN;
+            ic->u.binop.x = *place;
+            ic->u.binop.y.kind = O_CONSTANT;
+            ic->u.binop.y.u.value = node->childNodes[0]->valInt;
+            addCode(ic);
             break;
-        case TR_FLOAT:
+        }
+        case TR_FLOAT:{
             //Exp -> FLOAT
             ret = malloc(sizeof(Type));
             ret->kind = BASIC;
             ret->u.basic = 0;
             break;
+        }
         default:
             break;
         }
         break;
     case 2:
-        ret = Exp(node->childNodes[1],0,NULL);
         switch (node->childNodes[0]->type) {
-        case TR_MINUS:
+        case TR_MINUS:{
             //Exp -> MINUS Exp
+            
+            //intercode generate
+            Operand *t1 = newTemp();
+            ret = Exp(node->childNodes[1],0,NULL,t1);
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_MINUS;
+            ic->u.triop.x = *place;
+            ic->u.triop.y.kind = O_CONSTANT;
+            ic->u.triop.y.u.value = 0;
+            ic->u.triop.z = *t1;
+            addCode(ic);
+
             if(ret->kind != BASIC)
                 ErrorHandle(7,node->linenum,"");
             break;
-        case TR_NOT:
+        }
+        case TR_NOT:{
             //Exp -> NOT Exp
-            if(ret->kind != BASIC || ret->u.basic == 0)
-                ErrorHandle(7,node->linenum,"");
+            // if(ret->kind != BASIC || ret->u.basic == 0)
+            //     ErrorHandle(7,node->linenum,"");
+            //intercode generate
+            Operand *l1 = newLabel();
+            Operand *l2 = newLabel();
+
+            InterCode *ic0 = malloc(sizeof(InterCode));
+            ic0->kind = I_ASSIGN;
+            ic0->u.binop.x = *place;
+            ic0->u.binop.y.kind = O_CONSTANT;
+            ic0->u.binop.y.u.value = 0;
+            addCode(ic0);
+
+            ret = Cond(node,l1,l2);
+
+            InterCode *ic1 = malloc(sizeof(InterCode));
+            ic1->kind = I_LABEL;
+            ic1->u.sinop.x = *l1;
+            addCode(ic1);
+
+            InterCode *ic2 = malloc(sizeof(InterCode));
+            ic2->kind = I_ASSIGN;
+            ic2->u.binop.x = *place;
+            ic2->u.binop.y.kind = O_CONSTANT;
+            ic2->u.binop.y.u.value = 1;
+            addCode(ic2);
+
+            InterCode *ic3 = malloc(sizeof(InterCode));
+            ic3->kind = I_LABEL;
+            ic3->u.sinop.x = *l2;
+            addCode(ic3);
             break;
+        }
         default:
             break;
         }
@@ -570,38 +749,163 @@ Type* Exp(Node *node, int ifLeft, int *retLeft)
         case TR_ASSIGNOP:{
             //Exp -> Exp ASSIGNOP Exp
             int isleft = 0;
-            Type *t1 = Exp(node->childNodes[0],1,&isleft);
-            Type *t2 = Exp(node->childNodes[2],0,NULL);
+            Operand *temp0;
+            Operand *temp = newTemp();
+            Type *t1;
+            
+            if (node->childNodes[0]->length != 1) {
+                temp0 = newAddr();
+                t1 = Exp(node->childNodes[0],1,&isleft,temp0);
+            }else{
+                temp0 = malloc(sizeof(Operand));
+                temp0->kind = O_NULL;
+                t1 = Exp(node->childNodes[0],1,&isleft,temp0);
+            }
+            
+            Type *t2 = Exp(node->childNodes[2],0,NULL,temp);
             if(isleft == 0)
                 ErrorHandle(6,node->linenum,"");
             if(!TypeEqual(t1,t2))
                 ErrorHandle(5,node->linenum,"");
             ret = t1;
+
+            //intercode generate
+            if (node->childNodes[0]->length != 1) {
+
+                InterCode *ic0 = malloc(sizeof(InterCode));
+                ic0->kind = I_PUTVALUE;
+                ic0->u.binop.x = *temp0;
+                ic0->u.binop.y = *temp;
+                addCode(ic0);
+
+                InterCode *ic1 = malloc(sizeof(InterCode));
+                ic1->kind = I_ASSIGN;
+                ic1->u.binop.x = *place;
+                ic1->u.binop.y = *temp0;
+                addCode(ic1);
+            }else{
+                InterCode *ic0 = malloc(sizeof(InterCode));
+                ic0->kind = I_ASSIGN;
+                ic0->u.binop.x.kind = O_VARIABLE;
+                strcpy(ic0->u.binop.x.u.name,node->childNodes[0]->childNodes[0]->valString);
+                ic0->u.binop.y = *temp;
+                addCode(ic0);
+
+                InterCode *ic1 = malloc(sizeof(InterCode));
+                ic1->kind = I_ASSIGN;
+                ic1->u.binop.x = *place;
+                ic1->u.binop.y.kind = O_VARIABLE;
+                strcpy(ic1->u.binop.y.u.name,node->childNodes[0]->childNodes[0]->valString);
+                addCode(ic1);
+            }
+            
             break;
         }
         case TR_AND:
             //Exp -> Exp AND Exp
-        case TR_OR:{
+        case TR_OR:
             //Exp -> Exp OR Exp
-            Type *t1 = Exp(node->childNodes[0],0,NULL);
-            Type *t2 = Exp(node->childNodes[2],0,NULL);
-            if(t1->u.basic != 1 || t2->u.basic != 1)
+        case TR_RELOP:{
+            //Exp -> Exp RELOP Exp
+            // Type *t1 = Exp(node->childNodes[0],0,NULL);
+            // Type *t2 = Exp(node->childNodes[2],0,NULL);
+            // if(t1->u.basic != 1 || t2->u.basic != 1)
+            //     ErrorHandle(7,node->linenum,"");
+            // ret = t1;
+            //intercode generate
+            Operand *l1 = newLabel();
+            Operand *l2 = newLabel();
+
+            InterCode *ic0 = malloc(sizeof(InterCode));
+            ic0->kind = I_ASSIGN;
+            ic0->u.binop.x = *place;
+            ic0->u.binop.y.kind = O_CONSTANT;
+            ic0->u.binop.y.u.value = 0;
+            addCode(ic0);
+
+            ret = Cond(node,l1,l2);
+
+            InterCode *ic1 = malloc(sizeof(InterCode));
+            ic1->kind = I_LABEL;
+            ic1->u.sinop.x = *l1;
+            addCode(ic1);
+
+            InterCode *ic2 = malloc(sizeof(InterCode));
+            ic2->kind = I_ASSIGN;
+            ic2->u.binop.x = *place;
+            ic2->u.binop.y.kind = O_CONSTANT;
+            ic2->u.binop.y.u.value = 1;
+            addCode(ic2);
+
+            InterCode *ic3 = malloc(sizeof(InterCode));
+            ic3->kind = I_LABEL;
+            ic3->u.sinop.x = *l2;
+            addCode(ic3);
+            break;
+        }
+        case TR_PLUS:{
+            //Exp -> Exp PLUS Exp
+            Operand* temp1 = newTemp();
+            Operand* temp2 = newTemp();
+            Type *t1 = Exp(node->childNodes[0],0,NULL,temp1);
+            Type *t2 = Exp(node->childNodes[2],0,NULL,temp2);
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_ADD;
+            ic->u.triop.x = *place;
+            ic->u.triop.y = *temp1;
+            ic->u.triop.z = *temp2;
+            addCode(ic);
+            if(t1 == NULL || t2 == NULL || t1->kind != BASIC || t2->kind != BASIC || TypeEqual(t1,t2) == 0)
                 ErrorHandle(7,node->linenum,"");
             ret = t1;
             break;
         }
-        case TR_RELOP:
-            //Exp -> Exp RELOP Exp
-        case TR_PLUS:
-            //Exp -> Exp PLUS Exp
-        case TR_MINUS:
+        case TR_MINUS:{
             //Exp -> Exp MINUS Exp
-        case TR_STAR:
+            Operand* temp1 = newTemp();
+            Operand* temp2 = newTemp();
+            Type *t1 = Exp(node->childNodes[0],0,NULL,temp1);
+            Type *t2 = Exp(node->childNodes[2],0,NULL,temp2);
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_MINUS;
+            ic->u.triop.x = *place;
+            ic->u.triop.y = *temp1;
+            ic->u.triop.z = *temp2;
+            addCode(ic);
+            if(t1 == NULL || t2 == NULL || t1->kind != BASIC || t2->kind != BASIC || TypeEqual(t1,t2) == 0)
+                ErrorHandle(7,node->linenum,"");
+            ret = t1;
+            break;
+        }
+        case TR_STAR:{
             //Exp -> Exp STAR Exp
+            Operand* temp1 = newTemp();
+            Operand* temp2 = newTemp();
+            Type *t1 = Exp(node->childNodes[0],0,NULL,temp1);
+            Type *t2 = Exp(node->childNodes[2],0,NULL,temp2);
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_STAR;
+            ic->u.triop.x = *place;
+            ic->u.triop.y = *temp1;
+            ic->u.triop.z = *temp2;
+            addCode(ic);
+            if(t1 == NULL || t2 == NULL || t1->kind != BASIC || t2->kind != BASIC || TypeEqual(t1,t2) == 0)
+                ErrorHandle(7,node->linenum,"");
+            ret = t1;
+            break;
+        }
         case TR_DIV:{
             //Exp -> Exp DIV Exp
-            Type *t1 = Exp(node->childNodes[0],0,NULL);
-            Type *t2 = Exp(node->childNodes[2],0,NULL);
+            Operand* temp1 = newTemp();
+            Operand* temp2 = newTemp();
+            Type *t1 = Exp(node->childNodes[0],0,NULL,temp1);
+            Type *t2 = Exp(node->childNodes[2],0,NULL,temp2);
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_ADD;
+            ic->u.triop.x = *place;
+            ic->u.triop.y = *temp1;
+            ic->u.triop.z = *temp2;
+            addCode(ic);
             if(t1 == NULL || t2 == NULL || t1->kind != BASIC || t2->kind != BASIC || TypeEqual(t1,t2) == 0)
                 ErrorHandle(7,node->linenum,"");
             ret = t1;
@@ -609,26 +913,52 @@ Type* Exp(Node *node, int ifLeft, int *retLeft)
         }
         case TR_Exp:{
             //Exp -> LP Exp RP
-            Type *t1 = Exp(node->childNodes[0],0,NULL);
-            if(t1->kind != BASIC)
+            //intercode generate
+            // Operand *t1 = newTemp();
+            ret = Exp(node->childNodes[1],0,NULL,place);
+            // InterCode *ic = malloc(sizeof(InterCode));
+            // ic->kind = I_MINUS;
+            // ic->u.triop.x = *place;
+            // ic->u.triop.y.kind = O_CONSTANT;
+            // ic->u.triop.y.u.value = 0;
+            // ic->u.triop.z = *t1;
+            // addCode(ic);
+            if(ret->kind != BASIC)
                 ErrorHandle(7,node->linenum,"");
-            ret = t1;
             break;
         }
         case TR_LP:{
             //Exp -> ID LP RP
-            Symbol *sb = stSearch(node->childNodes[0]->valString);
-            if(sb == NULL)
-                ErrorHandle(2,node->linenum,node->childNodes[0]->valString);
-            else if(sb->kind != Func)
-                ErrorHandle(11,node->linenum,node->childNodes[0]->valString);
-            else
-                ret = sb->funcMessage->returnType;
+            if (strcmp(node->childNodes[0]->valString,"read") != 0) {
+                Symbol *sb = stSearch(node->childNodes[0]->valString);
+                if(sb == NULL)
+                    ErrorHandle(2,node->linenum,node->childNodes[0]->valString);
+                else if(sb->kind != Func)
+                    ErrorHandle(11,node->linenum,node->childNodes[0]->valString);
+                else
+                    ret = sb->funcMessage->returnType;
+                InterCode *ic = malloc(sizeof(InterCode));
+                ic->kind = I_CALL;
+                ic->u.binop.x = *place;
+                ic->u.binop.y.kind = O_FUNCTION;
+                strcpy(ic->u.binop.y.u.name,sb->name);
+                addCode(ic);
+            }else{
+                InterCode *ic = malloc(sizeof(InterCode));
+                ic->kind = I_READ;
+                ic->u.sinop.x = *place;
+                addCode(ic);
+                ret = malloc(sizeof(Type));
+                ret->kind = BASIC;
+                ret->u.basic = 1;
+            }
+            
             break;
         }
         case TR_DOT:{
             //Exp -> Exp DOT ID
-            Type *t = Exp(node->childNodes[0],0,NULL);
+            //未要求结构体实现！
+            Type *t = Exp(node->childNodes[0],0,NULL,NULL);
             if(t->kind != STRUCTURE)
                 ErrorHandle(13,node->linenum,"");
             else{
@@ -656,35 +986,68 @@ Type* Exp(Node *node, int ifLeft, int *retLeft)
         switch (node->childNodes[0]->type) {
         case TR_ID:{
             //Exp -> ID LP Args RP
-            Symbol *sb = stSearch(node->childNodes[0]->valString);
-            if(sb == NULL)
-                ErrorHandle(2,node->linenum,node->childNodes[0]->valString);
-            else if(sb->kind != Func)
-                ErrorHandle(11,node->linenum,node->childNodes[0]->valString);
-            else{
-                FieldList *fl1 = sb->funcMessage->input;
-                FieldList *fl2 = Args(node->childNodes[2]);
-                int flag = 0;
-                while(fl1 != NULL && fl2 != NULL){
-                    if(!TypeEqual(fl1->type,fl2->type))
-                        flag = 1;
-                    fl1 = fl1->tail;
-                    fl2 = fl2->tail;
-                }
-                if(fl1 != fl2)
-                    flag = 1;
-                if(1 == flag)
-                    ErrorHandle(9,node->linenum,node->childNodes[0]->valString);
-                else
-                    ret = sb->funcMessage->returnType;
+            Operand *head = malloc(sizeof(Operand));
+            if (strcmp(node->childNodes[0]->valString,"write") == 0) {
+                FieldList *fl2 = Args(node->childNodes[2],head);
+                InterCode *ic = malloc(sizeof(InterCode));
+                ic->kind = I_WRITE;
+                ic->u.sinop.x = *(head->next);
+                addCode(ic);
+                ret = malloc(sizeof(Type));
+                ret->kind = BASIC;
+                ret->u.basic = 1;
             }
+            else{
+                Symbol *sb = stSearch(node->childNodes[0]->valString);
+                if(sb == NULL)
+                    ErrorHandle(2,node->linenum,node->childNodes[0]->valString);
+                else if(sb->kind != Func)
+                    ErrorHandle(11,node->linenum,node->childNodes[0]->valString);
+                else{
+                    FieldList *fl1 = sb->funcMessage->input;
+                    FieldList *fl2 = Args(node->childNodes[2],head);
+                    int flag = 0;
+                    while(fl1 != NULL && fl2 != NULL){
+                        if(!TypeEqual(fl1->type,fl2->type))
+                            flag = 1;
+                        fl1 = fl1->tail;
+                        fl2 = fl2->tail;
+                    }
+                    if(fl1 != fl2)
+                        flag = 1;
+                    if(1 == flag)
+                        ErrorHandle(9,node->linenum,node->childNodes[0]->valString);
+                    else
+                        ret = sb->funcMessage->returnType;
+                    //intercode generate
+                    //参数链表头结点为额外结点，不存储任何信息！
+                    for(Operand *p = head->next;p != NULL;p = p->next){
+                        InterCode *ic = malloc(sizeof(InterCode));
+                        ic->kind = I_ARG;
+                        ic->u.sinop.x = *p;
+                        addCode(ic);
+                    }
+                    InterCode *ic = malloc(sizeof(InterCode));
+                    ic->kind = I_CALL;
+                    ic->u.binop.x = *place;
+                    ic->u.binop.y.kind = O_FUNCTION;
+                    strcpy(ic->u.binop.y.u.name,node->childNodes[0]->valString);
+                    addCode(ic);
+                }
+            }
+            
             break;
         }
         case TR_Exp:{
             //Exp -> Exp LB Exp RB
-            Type *t1 = Exp(node->childNodes[0],0,NULL);
-            Type *t2 = Exp(node->childNodes[2],0,NULL);
-            if(t1->kind != ARRAY)
+            //intercode generate
+            Operand *temp1 = newAddr();
+            Operand *temp2 = newTemp();
+            Operand *temp3 = newTemp();
+            Type *t1 = Exp(node->childNodes[0],0,NULL,temp1);
+            Type *t2 = Exp(node->childNodes[2],0,NULL,temp2);
+
+            if(t1->kind != ARRAY && t1->kind != ADDRESS)
                 ErrorHandle(10,node->linenum,"");
             else if(t2->u.basic != 1)
                 ErrorHandle(12,node->linenum,"");
@@ -692,6 +1055,33 @@ Type* Exp(Node *node, int ifLeft, int *retLeft)
                 ret = t1->u.array.elem;
             if(1 == ifLeft)
                 *retLeft = 1;
+            
+            int offset = 4;
+            for(Type *p = t1->u.array.elem;p->kind == ARRAY;p = p->u.array.elem)
+                offset = offset * p->u.array.size;
+
+            InterCode *ic0 = malloc(sizeof(InterCode));
+            ic0->kind = I_STAR;
+            ic0->u.triop.x = *temp3;
+            ic0->u.triop.y = *temp2;
+            ic0->u.triop.z.kind = O_CONSTANT;
+            ic0->u.triop.z.u.value = offset;
+            addCode(ic0);
+
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_ADD;
+            ic->u.triop.x = *place;
+            ic->u.triop.y = *temp1;
+            ic->u.triop.z = *temp3;
+            addCode(ic);
+
+            if(place->kind != O_ADDRESS){
+                InterCode *ic = malloc(sizeof(InterCode));
+                ic->kind = I_GETVALUE;
+                ic->u.binop.x = *place;
+                ic->u.binop.y = *place;
+                addCode(ic);
+            }
             break;
         }
         default:
@@ -704,20 +1094,103 @@ Type* Exp(Node *node, int ifLeft, int *retLeft)
     return ret;
 }
 
-FieldList *Args(Node *node)
+Type * Cond(Node *node,Operand *label1,Operand *label2){
+    Type *ret;
+    ret = malloc(sizeof(Type));
+    ret->kind = BASIC;
+    ret->u.basic = 1;
+    switch (node->childNodes[1]->type)
+    {
+        case TR_Exp:
+            ret = Cond(node->childNodes[1],label2,label1);
+            break;
+        case TR_RELOP:{
+            Operand *t1 = newTemp();
+            Operand *t2 = newTemp();
+            ret = Exp(node->childNodes[0],0,NULL,t1);
+            ret = Exp(node->childNodes[2],0,NULL,t2);
+
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_IFGOTO;
+            ic->u.forop.x = *t1;
+            ic->u.forop.y = *t2;
+            ic->u.forop.z = *label1;
+            ic->u.forop.relop = node->childNodes[1]->valInt;
+            addCode(ic);
+
+            InterCode *ic0 = malloc(sizeof(InterCode));
+            ic0->kind = I_GOTO;
+            ic0->u.sinop.x = *label2;
+            addCode(ic0);
+            break;
+        }
+        case TR_AND:{
+            Operand *nl = newLabel();
+            ret = Cond(node->childNodes[0],nl,label2);
+
+            InterCode *ic0 = malloc(sizeof(InterCode));
+            ic0->kind = I_GOTO;
+            ic0->u.sinop.x = *nl;
+            addCode(ic0);
+
+            ret = Cond(node->childNodes[2],label1,label2);
+
+            break;
+        }
+        case TR_OR:{
+            Operand *nl = newLabel();
+            ret = Cond(node->childNodes[0],label1,nl);
+
+            InterCode *ic0 = malloc(sizeof(InterCode));
+            ic0->kind = I_GOTO;
+            ic0->u.sinop.x = *nl;
+            addCode(ic0);
+            
+            ret = Cond(node->childNodes[2],label1,label2);
+            break;
+        }
+        default:{
+            Operand *t1 = newTemp();
+            ret = Exp(node,0,NULL,t1);
+
+            InterCode *ic = malloc(sizeof(InterCode));
+            ic->kind = I_IFGOTO;
+            ic->u.forop.x = *t1;
+            ic->u.forop.y.kind = O_CONSTANT;
+            ic->u.forop.y.u.value = 0;
+            ic->u.forop.z = *label1;
+            ic->u.forop.relop = 6;
+            addCode(ic);
+
+            InterCode *ic0 = malloc(sizeof(InterCode));
+            ic0->kind = I_GOTO;
+            ic0->u.sinop.x = *label2;
+            addCode(ic0);
+
+            break;
+        }
+    }
+    return  ret;
+}
+
+FieldList *Args(Node *node , Operand *head)
 {
     if(NULL == node)
         return NULL;
     FieldList *fl = malloc(sizeof(FieldList));
     fl->tail = NULL;
-    fl->type = Exp(node->childNodes[0],0,NULL);
+    //intercode generate
+    Operand *t1 = newTemp();
+    fl->type = Exp(node->childNodes[0],0,NULL,t1);
+    t1->next = head->next;
+    head->next = t1;
     switch (node->length) {
     case 1:
         //Args -> Exp
         break;
     case 3:
         //Args -> Exp COMMA Args
-        fl->tail = Args(node->childNodes[2]);
+        fl->tail = Args(node->childNodes[2],head);
         break;
     default:
         break;

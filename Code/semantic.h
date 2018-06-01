@@ -4,6 +4,7 @@
 #include "mytree.h"
 #include "type.h"
 #include "symboltable.h"
+#include "intercode.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
@@ -36,8 +37,9 @@ FieldList* Def(Node *node,int root);
 FieldList* DecList(Node *node, Type * type,int root);
 FieldList* Dec(Node *node, Type * type,int root);
 //Expressions
-Type * Exp(Node *node,int ifLeft,int *retLeft);
-FieldList *Args(Node *node);
+Type * Exp(Node *node,int ifLeft,int *retLeft,Operand *place);
+Type * Cond(Node *node,Operand *label1,Operand *label2);
+FieldList *Args(Node *node,Operand *head);
 //Error handle
 void ErrorHandle(int type,int line,char* info);
 //Type equal
