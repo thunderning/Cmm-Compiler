@@ -1,9 +1,9 @@
 #ifndef SEMANTIC_H
 #define SEMANTIC_H
 
-#include "mytree.h"
+#include "myTree.h"
 #include "type.h"
-#include "symboltable.h"
+#include "symbolTable.h"
 #include "intercode.h"
 #include <stdio.h>
 #include <assert.h>
