@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "symboltable.h"
+#include "symbolTable.h"
 
 extern int currentDepth = 0;
 

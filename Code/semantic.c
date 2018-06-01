@@ -1,5 +1,5 @@
 #include "semantic.h"
-#include "symboltable.h"
+#include "symbolTable.h"
 
 void Program(Node* start)
 {
