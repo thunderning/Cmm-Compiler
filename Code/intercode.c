@@ -254,8 +254,8 @@ void optimizeCode(){
         }
     }
     int flag = 0;
+    Operand **override = malloc((tCount+1)*sizeof(Operand *));
     while(1){
-        Operand **override = malloc((tCount+1)*sizeof(Operand *));
         for(InterCode* i = headCode; i != NULL;)
         {
             if(i->kind == I_ASSIGN 
