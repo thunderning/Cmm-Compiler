@@ -18,10 +18,14 @@ int main(int argc, char** argv){
   yyparse();
   //if(iserror == 0) printTree(startNode,0);
   //printf("----------------------------------------------------\n");
-  Program(startNode);
-  printf("Finish translate\n");
-  optimizeCode();
-  printCodes(argv[2]);
+  if(checkStruct(startNode))
+    printf("Cannot translate: Code contains variables or parameters of structure type.\n");
+  else{
+    Program(startNode);
+    //printf("Finish translate\n");
+    optimizeCode();
+    printCodes(argv[2]);
+  }
 
   return 0;
 }

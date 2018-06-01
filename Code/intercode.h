@@ -1,6 +1,7 @@
 #ifndef INTERCODE_H
 #define INTERCODE_H
 
+#include "myTree.h"
 #include <stdio.h>
 
 typedef struct Operand_ Operand;
@@ -52,6 +53,7 @@ void deleteCode(InterCode* ic);
 void printCodes(char* filename);
 void printOp(FILE* fout,Operand* op);
 void printCode(FILE* fout,InterCode* ic);
+int checkStruct(Node *node);
 void optimizeCode();
 Operand* newTemp();
 Operand* newLabel();
